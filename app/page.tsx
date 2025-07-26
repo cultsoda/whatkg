@@ -26,8 +26,23 @@ import GoalSettingFirebase from "@/components/goal-setting-firebase"
 import WeightListFirebase from "@/components/weight-list-firebase"
 import SettingsFirebase from "@/components/settings-firebase"
 
+// 타입 정의
+interface FamilyMember {
+  id: string
+  name: string
+  icon: React.ReactNode
+  color: string
+  bgColor: string
+}
+
+interface FormData {
+  email: string
+  password: string
+  displayName: string
+}
+
 // 가족 구성원 데이터
-const familyMembers = [
+const familyMembers: FamilyMember[] = [
   {
     id: "mom",
     name: "엄마",
@@ -60,15 +75,15 @@ const familyMembers = [
 
 export default function App() {
   // 상태 관리
-  const [currentUser, setCurrentUser] = useState(null)
-  const [currentScreen, setCurrentScreen] = useState("login")
-  const [selectedMember, setSelectedMember] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [currentScreen, setCurrentScreen] = useState<string>("login")
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
   
   // 로그인 폼 상태
-  const [isLogin, setIsLogin] = useState(true)
-  const [showPassword, setShowPassword] = useState(false)
-  const [formData, setFormData] = useState({
+  const [isLogin, setIsLogin] = useState<boolean>(true)
+  const [showPassword, setShowPassword] = useState<boolean>(false)
+  const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     displayName: ''
@@ -76,7 +91,7 @@ export default function App() {
 
   // Firebase 인증 상태 감지
   useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
+    const unsubscribe = onAuthStateChange((user: any) => {
       setCurrentUser(user)
       setLoading(false)
       
@@ -92,7 +107,7 @@ export default function App() {
   }, [])
 
   // 입력 처리
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
@@ -100,7 +115,7 @@ export default function App() {
   }
 
   // 이메일 인증 처리
-  const handleEmailAuth = async (e) => {
+  const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
 
@@ -112,11 +127,11 @@ export default function App() {
         await signUpWithEmail(formData.email, formData.password, formData.displayName)
         toast({ title: "회원가입 성공!" })
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('인증 오류:', error)
       toast({ 
         title: isLogin ? "로그인 실패" : "회원가입 실패",
-        description: error.message,
+        description: error.message || "알 수 없는 오류가 발생했습니다.",
         variant: "destructive"
       })
     } finally {
@@ -130,11 +145,11 @@ export default function App() {
     try {
       await signInWithGoogle()
       toast({ title: "Google 로그인 성공!" })
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google 로그인 오류:', error)
       toast({ 
         title: "Google 로그인 실패",
-        description: error.message,
+        description: error.message || "알 수 없는 오류가 발생했습니다.",
         variant: "destructive"
       })
     } finally {
@@ -143,7 +158,7 @@ export default function App() {
   }
 
   // 화면 네비게이션
-  const handleNavigate = (screen, member = null) => {
+  const handleNavigate = (screen: string, member?: FamilyMember | null) => {
     if (member) {
       setSelectedMember(member)
     }
@@ -151,7 +166,7 @@ export default function App() {
   }
 
   // 구성원 선택
-  const handleMemberSelect = (member) => {
+  const handleMemberSelect = (member: FamilyMember) => {
     setSelectedMember(member)
     setCurrentScreen("dashboard")
   }
