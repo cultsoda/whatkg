@@ -1,11 +1,23 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Scale, User, UserCheck, Baby, Heart } from "lucide-react"
+import { Scale, User, UserCheck, Baby, Heart, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Toaster } from "@/components/ui/toaster"
+import { toast } from "@/hooks/use-toast"
+
+// Firebase 서비스들
+import { 
+  signInWithEmail, 
+  signUpWithEmail, 
+  signInWithGoogle, 
+  logOut, 
+  onAuthStateChange 
+} from "@/lib/services/authService"
+
+// 기존 컴포넌트들
 import MainDashboard from "@/components/main-dashboard"
 import WeightRecord from "@/components/weight-record"
 import WeightChart from "@/components/weight-chart"
@@ -14,15 +26,8 @@ import GoalSetting from "@/components/goal-setting"
 import WeightList from "@/components/weight-list"
 import Settings from "@/components/settings"
 
-interface FamilyMember {
-  id: string
-  name: string
-  icon: React.ReactNode
-  color: string
-  bgColor: string
-}
-
-const familyMembers: FamilyMember[] = [
+// 가족 구성원 데이터
+const familyMembers = [
   {
     id: "mom",
     name: "엄마",
@@ -32,7 +37,7 @@ const familyMembers: FamilyMember[] = [
   },
   {
     id: "dad",
-    name: "아빠",
+    name: "아빠", 
     icon: <UserCheck className="w-12 h-12" />,
     color: "text-blue-600",
     bgColor: "bg-blue-50 hover:bg-blue-100",
@@ -41,7 +46,7 @@ const familyMembers: FamilyMember[] = [
     id: "son",
     name: "아들",
     icon: <Baby className="w-12 h-12" />,
-    color: "text-green-600",
+    color: "text-green-600", 
     bgColor: "bg-green-50 hover:bg-green-100",
   },
   {
@@ -53,136 +58,255 @@ const familyMembers: FamilyMember[] = [
   },
 ]
 
-export default function LoginScreen() {
-  const [selectedMember, setSelectedMember] = useState<string | null>(null)
-  const [currentScreen, setCurrentScreen] = useState<string>("login")
-  const [currentUser, setCurrentUser] = useState<any>(null)
+export default function App() {
+  // 상태 관리
+  const [currentUser, setCurrentUser] = useState(null)
+  const [currentScreen, setCurrentScreen] = useState("login")
+  const [selectedMember, setSelectedMember] = useState(null)
+  const [loading, setLoading] = useState(true)
+  
+  // 로그인 폼 상태
+  const [isLogin, setIsLogin] = useState(true)
+  const [showPassword, setShowPassword] = useState(false)
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    displayName: ''
+  })
 
-  const handleMemberSelect = (memberId: string) => {
-    setSelectedMember(memberId)
-    const member = familyMembers.find((m) => m.id === memberId)
+  // Firebase 인증 상태 감지
+  useEffect(() => {
+    const unsubscribe = onAuthStateChange((user) => {
+      setCurrentUser(user)
+      setLoading(false)
+      
+      if (user) {
+        setCurrentScreen("memberSelect")
+      } else {
+        setCurrentScreen("login")
+      }
+    })
 
-    // 샘플 데이터 추가
-    const userData = {
-      ...member,
-      currentWeight: memberId === "mom" ? 58.5 : memberId === "dad" ? 75.2 : memberId === "son" ? 45.8 : 52.3,
-      previousWeight: memberId === "mom" ? 58.8 : memberId === "dad" ? 75.0 : memberId === "son" ? 46.1 : 52.1,
-      lastRecordDate: "2024-07-25",
-    }
+    return unsubscribe
+  }, [])
 
-    setCurrentUser(userData)
-    setCurrentScreen("dashboard")
+  // 입력 처리
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
   }
 
-  const handleNavigate = (screen: string) => {
-    if (screen === "home" || screen === "dashboard") {
-      setCurrentScreen("dashboard")
-    } else if (screen === "record") {
-      setCurrentScreen("record")
-    } else if (screen === "chart") {
-      setCurrentScreen("chart")
-    } else if (screen === "calendar") {
-      setCurrentScreen("calendar")
-    } else if (screen === "goal") {
-      setCurrentScreen("goal")
-    } else if (screen === "list") {
-      setCurrentScreen("list")
-    } else if (screen === "settings") {
-      setCurrentScreen("settings")
-    } else if (screen === "logout") {
-      setCurrentScreen("login")
-      setCurrentUser(null)
+  // 이메일 인증 처리
+  const handleEmailAuth = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      if (isLogin) {
+        await signInWithEmail(formData.email, formData.password)
+        toast({ title: "로그인 성공!" })
+      } else {
+        await signUpWithEmail(formData.email, formData.password, formData.displayName)
+        toast({ title: "회원가입 성공!" })
+      }
+    } catch (error) {
+      toast({ 
+        title: "오류가 발생했습니다", 
+        description: error.message,
+        variant: "destructive" 
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Google 로그인
+  const handleGoogleAuth = async () => {
+    setLoading(true)
+    try {
+      await signInWithGoogle()
+      toast({ title: "Google 로그인 성공!" })
+    } catch (error) {
+      toast({ 
+        title: "Google 로그인 실패", 
+        description: error.message,
+        variant: "destructive" 
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 로그아웃
+  const handleLogout = async () => {
+    try {
+      await logOut()
       setSelectedMember(null)
-    } else {
-      // 다른 화면들은 추후 구현
-      alert(`${screen} 화면으로 이동`)
+      setCurrentScreen("login")
+      toast({ title: "로그아웃 되었습니다" })
+    } catch (error) {
+      toast({ 
+        title: "로그아웃 실패", 
+        description: error.message,
+        variant: "destructive" 
+      })
     }
   }
 
-  const handleUserChange = (userId: string) => {
-    handleMemberSelect(userId)
+  // 가족 구성원 선택
+  const handleMemberSelect = (memberId) => {
+    const member = familyMembers.find(m => m.id === memberId)
+    if (member) {
+      const userData = {
+        ...member,
+        currentWeight: 58.5,
+        previousWeight: 58.8,
+        lastRecordDate: "2024-07-25",
+        firebaseUser: currentUser
+      }
+      setSelectedMember(userData)
+      setCurrentScreen("dashboard")
+    }
   }
 
-  const handleSave = (record: { date: string; weight: number; memo: string }) => {
-    // 실제로는 데이터베이스에 저장
-    console.log("새 기록 저장:", record)
-    alert("기록이 저장되었습니다!")
+  // 화면 네비게이션
+  const handleNavigate = (screen) => {
+    if (screen === "logout") {
+      handleLogout()
+    } else {
+      setCurrentScreen(screen)
+    }
   }
 
-  const handleGoalSave = (goalData: any) => {
-    // 실제로는 데이터베이스에 저장
-    console.log("목표 설정 저장:", goalData)
-    alert("목표가 설정되었습니다!")
-  }
-
-  if (currentScreen === "dashboard" && currentUser) {
+  // 로딩 화면
+  if (loading) {
     return (
-      <>
-        <MainDashboard user={currentUser} onNavigate={handleNavigate} />
-        <Toaster />
-      </>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
     )
   }
 
-  if (currentScreen === "record" && currentUser) {
+  // 로그인 화면
+  if (currentScreen === "login") {
     return (
-      <>
-        <WeightRecord user={currentUser} onNavigate={handleNavigate} onSave={handleSave} />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          {/* 로고 */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
+              <Scale className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">WhatKG</h1>
+            <p className="text-gray-600 mt-2">가족 몸무게 관리</p>
+          </div>
+
+          {/* 탭 전환 */}
+          <div className="flex mb-6">
+            <button
+              className={`flex-1 py-2 px-4 rounded-l-lg font-medium transition-colors ${
+                isLogin ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              onClick={() => setIsLogin(true)}
+            >
+              로그인
+            </button>
+            <button
+              className={`flex-1 py-2 px-4 rounded-r-lg font-medium transition-colors ${
+                !isLogin ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              onClick={() => setIsLogin(false)}
+            >
+              회원가입
+            </button>
+          </div>
+
+          {/* 폼 */}
+          <form onSubmit={handleEmailAuth} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
+                <Input
+                  type="text"
+                  name="displayName"
+                  value={formData.displayName}
+                  onChange={handleInputChange}
+                  placeholder="이름을 입력하세요"
+                  required
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className="pl-10"
+                  placeholder="이메일을 입력하세요"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  className="pl-10 pr-10"
+                  placeholder="비밀번호를 입력하세요"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading}>
+              {loading ? "처리 중..." : (isLogin ? "로그인" : "회원가입")}
+            </Button>
+          </form>
+
+          <div className="mt-4">
+            <Button 
+              onClick={handleGoogleAuth} 
+              variant="outline" 
+              className="w-full"
+              disabled={loading}
+            >
+              Google로 {isLogin ? "로그인" : "회원가입"}
+            </Button>
+          </div>
+        </div>
         <Toaster />
-      </>
+      </div>
     )
   }
 
-  if (currentScreen === "chart" && currentUser) {
+  // 가족 구성원 선택 화면
+  if (currentScreen === "memberSelect") {
     return (
-      <>
-        <WeightChart user={currentUser} onNavigate={handleNavigate} />
-        <Toaster />
-      </>
-    )
-  }
-
-  if (currentScreen === "calendar" && currentUser) {
-    return (
-      <>
-        <WeightCalendar user={currentUser} onNavigate={handleNavigate} />
-        <Toaster />
-      </>
-    )
-  }
-
-  if (currentScreen === "goal" && currentUser) {
-    return (
-      <>
-        <GoalSetting user={currentUser} onNavigate={handleNavigate} onSave={handleGoalSave} />
-        <Toaster />
-      </>
-    )
-  }
-
-  if (currentScreen === "list" && currentUser) {
-    return (
-      <>
-        <WeightList user={currentUser} onNavigate={handleNavigate} />
-        <Toaster />
-      </>
-    )
-  }
-
-  if (currentScreen === "settings" && currentUser) {
-    return (
-      <>
-        <Settings user={currentUser} onNavigate={handleNavigate} onUserChange={handleUserChange} />
-        <Toaster />
-      </>
-    )
-  }
-
-  return (
-    <>
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md mx-auto space-y-8">
-          {/* 헤더 섹션 */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
               <div className="bg-white rounded-full p-4 shadow-lg">
@@ -191,43 +315,117 @@ export default function LoginScreen() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-800 mb-2">가족 몸무게 관리</h1>
-              <p className="text-gray-600 text-sm">건강한 가족을 위한 체중 관리 앱</p>
+              <p className="text-gray-600 text-sm">사용자를 선택해주세요</p>
             </div>
           </div>
 
-          {/* 가족 구성원 선택 섹션 */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold text-center text-gray-700 mb-6">사용자를 선택해주세요</h2>
-
-            <div className="grid grid-cols-2 gap-4">
-              {familyMembers.map((member) => (
-                <Card
-                  key={member.id}
-                  className={`cursor-pointer transition-all duration-200 transform hover:scale-105 ${
-                    selectedMember === member.id ? "ring-2 ring-emerald-500 shadow-lg" : "hover:shadow-md"
-                  }`}
-                  onClick={() => handleMemberSelect(member.id)}
-                >
-                  <CardContent className={`p-6 text-center ${member.bgColor} rounded-lg`}>
-                    <div className={`${member.color} mb-3 flex justify-center`}>{member.icon}</div>
-                    <h3 className="font-semibold text-gray-800 text-lg">{member.name}</h3>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 gap-4">
+            {familyMembers.map((member) => (
+              <Card
+                key={member.id}
+                className="cursor-pointer transition-all duration-200 transform hover:scale-105 hover:shadow-md"
+                onClick={() => handleMemberSelect(member.id)}
+              >
+                <CardContent className={`p-6 text-center ${member.bgColor} rounded-lg`}>
+                  <div className={`${member.color} mb-3 flex justify-center`}>{member.icon}</div>
+                  <h3 className="font-semibold text-gray-800 text-lg">{member.name}</h3>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
-          {/* 하단 정보 */}
-          <div className="text-center space-y-2">
-            <p className="text-xs text-gray-500">가족 모두의 건강한 체중 관리를 시작해보세요</p>
-            <div className="flex justify-center items-center space-x-1 text-xs text-gray-400">
-              <Heart className="w-3 h-3" />
-              <span>Family Health Tracker</span>
-            </div>
+          <div className="text-center">
+            <Button onClick={handleLogout} variant="outline">
+              로그아웃
+            </Button>
           </div>
         </div>
+        <Toaster />
       </div>
-      <Toaster />
-    </>
-  )
+    )
+  }
+
+  // 기존 화면들 (대시보드, 기록 등)
+  if (currentScreen === "dashboard" && selectedMember) {
+    return (
+      <>
+        <MainDashboard user={selectedMember} onNavigate={handleNavigate} />
+        <Toaster />
+      </>
+    )
+  }
+
+  if (currentScreen === "record" && selectedMember) {
+    return (
+      <>
+        <WeightRecord 
+          user={selectedMember} 
+          onNavigate={handleNavigate} 
+          onSave={(record) => {
+            console.log("기록 저장:", record)
+            toast({ title: "기록이 저장되었습니다!" })
+          }} 
+        />
+        <Toaster />
+      </>
+    )
+  }
+
+  if (currentScreen === "chart" && selectedMember) {
+    return (
+      <>
+        <WeightChart user={selectedMember} onNavigate={handleNavigate} />
+        <Toaster />
+      </>
+    )
+  }
+
+  if (currentScreen === "calendar" && selectedMember) {
+    return (
+      <>
+        <WeightCalendar user={selectedMember} onNavigate={handleNavigate} />
+        <Toaster />
+      </>
+    )
+  }
+
+  if (currentScreen === "goal" && selectedMember) {
+    return (
+      <>
+        <GoalSetting 
+          user={selectedMember} 
+          onNavigate={handleNavigate} 
+          onSave={(goalData) => {
+            console.log("목표 저장:", goalData)
+            toast({ title: "목표가 설정되었습니다!" })
+          }} 
+        />
+        <Toaster />
+      </>
+    )
+  }
+
+  if (currentScreen === "list" && selectedMember) {
+    return (
+      <>
+        <WeightList user={selectedMember} onNavigate={handleNavigate} />
+        <Toaster />
+      </>
+    )
+  }
+
+  if (currentScreen === "settings" && selectedMember) {
+    return (
+      <>
+        <Settings 
+          user={selectedMember} 
+          onNavigate={handleNavigate} 
+          onUserChange={handleMemberSelect} 
+        />
+        <Toaster />
+      </>
+    )
+  }
+
+  return null
 }
